@@ -1,11 +1,17 @@
-import { NodeTracerConfig, NodeTracerProvider } from '@opentelemetry/sdk-trace-node';
+import {
+  NodeTracerConfig,
+  NodeTracerProvider,
+} from '@opentelemetry/sdk-trace-node';
 import {
   BatchSpanProcessor,
   ConsoleSpanExporter,
   SDKRegistrationConfig,
   SimpleSpanProcessor,
 } from '@opentelemetry/sdk-trace-base';
-import { Instrumentation, registerInstrumentations } from '@opentelemetry/instrumentation';
+import {
+  Instrumentation,
+  registerInstrumentations,
+} from '@opentelemetry/instrumentation';
 import { awsLambdaDetector } from '@opentelemetry/resource-detector-aws';
 import {
   detectResourcesSync,
@@ -14,35 +20,53 @@ import {
 } from '@opentelemetry/resources';
 import { AwsInstrumentation } from '@opentelemetry/instrumentation-aws-sdk';
 import { AwsLambdaInstrumentation } from '@opentelemetry/instrumentation-aws-lambda';
-import {
-  diag,
-  DiagConsoleLogger,
-  DiagLogLevel,
-} from "@opentelemetry/api";
+import { diag, DiagConsoleLogger, DiagLogLevel } from '@opentelemetry/api';
 import { getEnv } from '@opentelemetry/core';
 import { AwsLambdaInstrumentationConfig } from '@opentelemetry/instrumentation-aws-lambda';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-proto';
-import { MeterProvider, MeterProviderOptions } from '@opentelemetry/sdk-metrics';
+import {
+  MeterProvider,
+  MeterProviderOptions,
+} from '@opentelemetry/sdk-metrics';
 
 function defaultConfigureInstrumentations() {
   // Use require statements for instrumentation to avoid having to have transitive dependencies on all the typescript
   // definitions.
   const { DnsInstrumentation } = require('@opentelemetry/instrumentation-dns');
-  const { ExpressInstrumentation } = require('@opentelemetry/instrumentation-express');
-  const { GraphQLInstrumentation } = require('@opentelemetry/instrumentation-graphql');
-  const { GrpcInstrumentation } = require('@opentelemetry/instrumentation-grpc');
-  const { HapiInstrumentation } = require('@opentelemetry/instrumentation-hapi');
-  const { HttpInstrumentation } = require('@opentelemetry/instrumentation-http');
-  const { IORedisInstrumentation } = require('@opentelemetry/instrumentation-ioredis');
+  const {
+    ExpressInstrumentation,
+  } = require('@opentelemetry/instrumentation-express');
+  const {
+    GraphQLInstrumentation,
+  } = require('@opentelemetry/instrumentation-graphql');
+  const {
+    GrpcInstrumentation,
+  } = require('@opentelemetry/instrumentation-grpc');
+  const {
+    HapiInstrumentation,
+  } = require('@opentelemetry/instrumentation-hapi');
+  const {
+    HttpInstrumentation,
+  } = require('@opentelemetry/instrumentation-http');
+  const {
+    IORedisInstrumentation,
+  } = require('@opentelemetry/instrumentation-ioredis');
   const { KoaInstrumentation } = require('@opentelemetry/instrumentation-koa');
-  const { MongoDBInstrumentation } = require('@opentelemetry/instrumentation-mongodb');
-  const { MySQLInstrumentation } = require('@opentelemetry/instrumentation-mysql');
+  const {
+    MongoDBInstrumentation,
+  } = require('@opentelemetry/instrumentation-mongodb');
+  const {
+    MySQLInstrumentation,
+  } = require('@opentelemetry/instrumentation-mysql');
   const { NetInstrumentation } = require('@opentelemetry/instrumentation-net');
   const { PgInstrumentation } = require('@opentelemetry/instrumentation-pg');
-  const { RedisInstrumentation } = require('@opentelemetry/instrumentation-redis');
-  const { WinstonInstrumentation } = require('@opentelemetry/instrumentation-winston');
+  const {
+    RedisInstrumentation,
+  } = require('@opentelemetry/instrumentation-redis');
+  const { BunyanInstrumentation } = require('@opentelemetry/instrumentation-bunyan');
 
-  return [  new DnsInstrumentation(),
+  return [
+    new DnsInstrumentation(),
     new ExpressInstrumentation(),
     new GraphQLInstrumentation(),
     new GrpcInstrumentation(),
@@ -55,21 +79,29 @@ function defaultConfigureInstrumentations() {
     new NetInstrumentation(),
     new PgInstrumentation(),
     new RedisInstrumentation(),
-    new WinstonInstrumentation()
-  ]
+    new BunyanInstrumentation( {
+      logHook: (span:any, record:any) => {
+        record.service = span.context().traceId;
+      }
+    })
+  ];
 }
 
 declare global {
   // in case of downstream configuring span processors etc
-  function configureTracerProvider(tracerProvider: NodeTracerProvider): void
+  function configureTracerProvider(tracerProvider: NodeTracerProvider): void;
   function configureTracer(defaultConfig: NodeTracerConfig): NodeTracerConfig;
   function configureSdkRegistration(
-    defaultSdkRegistration: SDKRegistrationConfig
+    defaultSdkRegistration: SDKRegistrationConfig,
   ): SDKRegistrationConfig;
-  function configureMeter(defaultConfig: MeterProviderOptions): MeterProviderOptions;
-  function configureMeterProvider(meterProvider: MeterProvider): void
-  function configureLambdaInstrumentation(config: AwsLambdaInstrumentationConfig): AwsLambdaInstrumentationConfig
-  function configureInstrumentations(): Instrumentation[]
+  function configureMeter(
+    defaultConfig: MeterProviderOptions,
+  ): MeterProviderOptions;
+  function configureMeterProvider(meterProvider: MeterProvider): void;
+  function configureLambdaInstrumentation(
+    config: AwsLambdaInstrumentationConfig,
+  ): AwsLambdaInstrumentationConfig;
+  function configureInstrumentations(): Instrumentation[];
 }
 
 console.log('Registering OpenTelemetry');
@@ -78,13 +110,19 @@ const instrumentations = [
   new AwsInstrumentation({
     suppressInternalInstrumentation: true,
   }),
-  new AwsLambdaInstrumentation(typeof configureLambdaInstrumentation === 'function' ? configureLambdaInstrumentation({}) : {}),
-  ...(typeof configureInstrumentations === 'function' ? configureInstrumentations: defaultConfigureInstrumentations)()
+  new AwsLambdaInstrumentation(
+    typeof configureLambdaInstrumentation === 'function'
+      ? configureLambdaInstrumentation({})
+      : {},
+  ),
+  ...(typeof configureInstrumentations === 'function'
+    ? configureInstrumentations
+    : defaultConfigureInstrumentations)(),
 ];
 
 // configure lambda logging
-const logLevel = getEnv().OTEL_LOG_LEVEL
-diag.setLogger(new DiagConsoleLogger(), logLevel)
+const logLevel = getEnv().OTEL_LOG_LEVEL;
+diag.setLogger(new DiagConsoleLogger(), logLevel);
 
 // Register instrumentations synchronously to ensure code is patched even before provider is ready.
 registerInstrumentations({
@@ -105,16 +143,18 @@ async function initializeProvider() {
 
   const tracerProvider = new NodeTracerProvider(config);
   if (typeof configureTracerProvider === 'function') {
-    configureTracerProvider(tracerProvider)
+    configureTracerProvider(tracerProvider);
   } else {
     // defaults
     tracerProvider.addSpanProcessor(
-      new BatchSpanProcessor(new OTLPTraceExporter())
+      new BatchSpanProcessor(new OTLPTraceExporter()),
     );
   }
   // logging for debug
   if (logLevel === DiagLogLevel.DEBUG) {
-    tracerProvider.addSpanProcessor(new SimpleSpanProcessor(new ConsoleSpanExporter()));
+    tracerProvider.addSpanProcessor(
+      new SimpleSpanProcessor(new ConsoleSpanExporter()),
+    );
   }
 
   let sdkRegistrationConfig: SDKRegistrationConfig = {};
@@ -126,21 +166,21 @@ async function initializeProvider() {
   // Configure default meter provider (doesn't export metrics)
   let meterConfig: MeterProviderOptions = {
     resource,
-  }
+  };
   if (typeof configureMeter === 'function') {
     meterConfig = configureMeter(meterConfig);
   }
 
   const meterProvider = new MeterProvider(meterConfig);
   if (typeof configureMeterProvider === 'function') {
-    configureMeterProvider(meterProvider)
+    configureMeterProvider(meterProvider);
   }
 
   // Re-register instrumentation with initialized provider. Patched code will see the update.
   registerInstrumentations({
     instrumentations,
     tracerProvider,
-    meterProvider
+    meterProvider,
   });
 }
 initializeProvider();
